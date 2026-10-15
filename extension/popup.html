@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>SQL 逐字输入</title><link rel="stylesheet" href="popup.css"></head>
+<body>
+  <header><span class="logo" aria-hidden="true">&gt;_</span><div><h1>SQL 逐字输入</h1><p>代码从第一个字符开始，逐字写入。</p></div><span class="edition">LOCAL</span></header>
+  <main>
+    <label for="sql" class="label-row">待输入的 SQL <span id="count">0 字符</span></label>
+    <textarea id="sql" spellcheck="false" placeholder="SELECT name, age&#10;FROM students&#10;WHERE age &gt;= 18;" aria-describedby="text-note"></textarea>
+    <p class="note" id="text-note">保留缩进、注释和换行 · 输入内容仅在本机处理</p>
+    <div class="settings"><label for="interval">字符间隔 <span class="number"><input id="interval" type="number" min="20" max="2000" step="10" value="100"><span>毫秒</span></span></label><label for="delay">开始前倒计时 <span class="number"><input id="delay" type="number" min="1" max="30" value="3"><span>秒</span></span></label></div>
+    <section class="status-card" aria-label="输入状态"><div class="status-top"><span id="state">准备输入</span><span id="progress-text">0 / 0</span></div><progress id="progress" max="1" value="0" aria-label="输入进度"></progress><p id="message" role="status" aria-live="polite">开始后，倒计时内点击网页的 SQL 编辑区。</p><p id="target" class="note"></p></section>
+    <p id="error" role="alert" hidden></p>
+    <div class="actions"><button id="start" class="primary">开始输入 <span aria-hidden="true">→</span></button><button id="pause" hidden>暂停</button><button id="resume" class="primary" hidden>继续输入</button><button id="stop" class="stop" hidden>停止</button></div>
+    <p class="footnote">换行不会发送 Enter 按键。代码输入后，请自行核对并执行。</p>
+  </main>
+  <footer><span>暂停 / 继续 <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>P</kbd></span><span>停止 <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>X</kbd></span></footer>
+  <script type="module" src="popup.js"></script>
+</body></html>

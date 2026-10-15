@@ -1,0 +1,5 @@
+node_modules/
+dist/
+tests/*-result.png
+tests/*-preview.png
+docs/educoder-restored.png

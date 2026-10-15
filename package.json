@@ -1,0 +1,12 @@
+{
+  "name": "sql-typer",
+  "version": "1.0.1",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/core.test.js",
+    "test:browser": "node tests/browser.mjs",
+    "package": "node scripts/package.mjs"
+  },
+  "devDependencies": { "playwright": "1.58.2", "codemirror": "5.65.21", "monaco-editor": "0.55.1" }
+}

@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "SQL 逐字输入",
+  "version": "1.0.1",
+  "description": "将 SQL 代码逐字输入网页编辑器，保留空白与换行，支持暂停和停止。",
+  "minimum_chrome_version": "118",
+  "permissions": ["debugger", "storage"],
+  "background": { "service_worker": "background.js", "type": "module" },
+  "action": { "default_popup": "popup.html", "default_title": "SQL 逐字输入" },
+  "commands": {
+    "toggle-pause": { "suggested_key": { "default": "Alt+Shift+P" }, "description": "暂停 / 倒计时继续输入" },
+    "stop": { "suggested_key": { "default": "Alt+Shift+X" }, "description": "停止输入" }
+  }
+}

@@ -1,0 +1,12 @@
+import {readFile, readdir, mkdir, copyFile, writeFile} from 'node:fs/promises';
+import {resolve,join} from 'node:path';
+import {execFileSync} from 'node:child_process';
+const manifest=JSON.parse(await readFile('extension/manifest.json','utf8'));
+const output=resolve('dist',`SQL逐字输入-${manifest.version}`);
+await mkdir(output,{recursive:true});
+for(const file of await readdir('extension'))await copyFile(join('extension',file),join(output,file));
+await copyFile('README.md',join(output,'使用说明.md'));
+const zip=output+'.zip';
+const quote=text=>"'"+text.replaceAll("'","''")+"'";
+execFileSync('pwsh',['-NoProfile','-Command',`Compress-Archive -LiteralPath ${quote(output)} -DestinationPath ${quote(zip)} -Force`],{stdio:'inherit'});
+console.log(zip);

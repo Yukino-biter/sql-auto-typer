@@ -1,0 +1,22 @@
+<!doctype html><html lang="zh-CN"><meta charset="utf-8"><title>SQL 输入验证</title>
+<link rel="stylesheet" href="/node_modules/codemirror/lib/codemirror.css">
+<style>body{font:16px 'Microsoft YaHei';max-width:900px;margin:40px auto}textarea,[contenteditable]{width:100%;min-height:160px;box-sizing:border-box;padding:12px;border:1px solid #aaa;white-space:pre-wrap;font:15px Consolas}.CodeMirror,#monaco{height:220px;border:1px solid #aaa}.row{margin:25px 0}button{padding:10px}#events{font:12px monospace}</style>
+<h1>SQL 逐字输入 · 兼容性测试页</h1><p>本页拦截所有粘贴事件。代码只能通过输入写入。</p>
+<div class="row"><h2>普通文本框</h2><textarea id="plain"></textarea></div>
+<div class="row"><h2>单行输入框</h2><input id="single"></div>
+<div class="row"><h2>富文本</h2><div id="rich" contenteditable="true"></div></div>
+<div class="row"><h2>CodeMirror 5</h2><textarea id="cm-source"></textarea></div>
+<div class="row"><h2>Monaco</h2><div id="monaco"></div></div>
+<p id="events"></p><script src="/node_modules/codemirror/lib/codemirror.js"></script>
+<script src="/node_modules/codemirror/mode/sql/sql.js"></script>
+<script src="/node_modules/codemirror/addon/edit/closebrackets.js"></script>
+<script src="/node_modules/monaco-editor/min/vs/loader.js"></script>
+<script>
+window.stats={paste:0,enter:0,tab:0,input:0,trusted:0,chars:[]};
+document.addEventListener('paste',event=>{event.preventDefault();stats.paste++;},true);
+document.addEventListener('keydown',event=>{if(event.key==='Enter')stats.enter++;if(event.key==='Tab')stats.tab++;},true);
+document.addEventListener('input',event=>{stats.input++;if(event.isTrusted)stats.trusted++;stats.chars.push(event.data);document.getElementById('events').textContent=JSON.stringify(stats);},true);
+window.cm=CodeMirror.fromTextArea(document.getElementById('cm-source'),{mode:'text/x-sql',lineNumbers:true,autoCloseBrackets:true});
+require.config({paths:{vs:'/node_modules/monaco-editor/min/vs'}});
+require(['vs/editor/editor.main'],()=>{window.editor=monaco.editor.create(document.getElementById('monaco'),{value:'',language:'sql',automaticLayout:true});window.ready=true;});
+</script></html>
