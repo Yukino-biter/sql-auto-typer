@@ -4,6 +4,11 @@
 <body>
   <header><span class="logo" aria-hidden="true">&gt;_</span><div><h1>SQL 逐字输入</h1><p>代码从第一个字符开始，逐字写入。</p></div><span class="edition">LOCAL</span></header>
   <main>
+    <section class="draft-help" aria-label="剪贴板变空格时的输入方式">
+      <button id="open-window" class="window-button">打开独立输入窗口 ↗</button>
+      <p id="draft-note" class="note">切回头歌后剪贴板变空格？先打开独立窗口，再去外部复制，直接回独立窗口粘贴。</p>
+      <p id="bound-target" class="note" hidden></p>
+    </section>
     <label for="sql" class="label-row">待输入的 SQL <span id="count">0 字符</span></label>
     <textarea id="sql" spellcheck="false" placeholder="SELECT name, age&#10;FROM students&#10;WHERE age &gt;= 18;" aria-describedby="text-note"></textarea>
     <p class="note" id="text-note">保留缩进、注释和换行 · 输入内容仅在本机处理</p>

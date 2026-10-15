@@ -161,7 +161,14 @@ chrome.tabs.onActivated.addListener(({tabId,windowId})=>{
   if(session && windowId===session.windowId && tabId!==session.tabId) pause(session,'切换了标签页，请返回原页面后继续。');
 });
 chrome.windows.onFocusChanged.addListener(windowId=>{
-  if(session && windowId!==session.windowId) pause(session,'切换了窗口，请返回原窗口后继续。');
+  if(!session || windowId===session.windowId) return;
+  const s=session;
+  if(windowId!==chrome.windows.WINDOW_ID_NONE) {pause(s,'切换了窗口，请返回原窗口后继续。');return;}
+  // Closing the extension window can emit a transient WINDOW_ID_NONE after start.
+  // Recheck only that transient event; an explicit other window still pauses immediately.
+  void chrome.windows.get(s.windowId).then(window=>{
+    if(session===s && !window.focused) pause(s,'切换了窗口，请返回原窗口后继续。');
+  }).catch(()=>{});
 });
 chrome.tabs.onUpdated.addListener((tabId,change)=>{
   if(session?.tabId===tabId && (change.status==='loading'||change.url)) {const s=session;s.job?.stop();void finish(s,'error','网页已刷新或跳转。请核对已输入内容后重新开始。');}

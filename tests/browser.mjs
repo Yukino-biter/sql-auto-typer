@@ -27,7 +27,7 @@ const context=await chromium.launchPersistentContext(profile,{headless:true,
   executablePath,
   args:[`--disable-extensions-except=${extension}`,`--load-extension=${extension}`]});
 const results=[];
-async function check(name,fn){await fn();results.push(name);console.log('PASS',name);}
+async function check(name,fn){if(process.env.SQL_TYPER_CASE && !name.includes(process.env.SQL_TYPER_CASE))return;await fn();results.push(name);console.log('PASS',name);}
 try {
   const worker=context.serviceWorkers()[0]||await context.waitForEvent('serviceworker');
   const page=await context.newPage();await page.goto(url);await page.waitForFunction(()=>window.ready);
@@ -45,6 +45,52 @@ try {
   };
   const sql="-- 中文与缩进 👩‍💻\nSELECT\t'id', 'a''b', (1 + 2)\n  FROM students\n WHERE name = '张三';\n";
   async function begin(text,focus,interval=20){await page.bringToFront();await focus();const result=await request('start',{tabId,text,interval,delay:1});assert.equal(result.ok,true,result.error);await page.bringToFront();await focus();}
+
+  await check('independent draft binds the source tab and types intact SQL after target focus erases clipboard',async()=>{
+    assert.equal(await popup.locator('#open-window').count(),1,'An independent draft window must be available before returning to the target');
+    await page.bringToFront();
+    const opened=context.waitForEvent('page');
+    await popup.evaluate(()=>document.getElementById('open-window').click());
+    const draft=await opened;await draft.waitForLoadState();
+    try {
+      assert.equal(new URL(draft.url()).searchParams.get('target'),String(tabId));
+      await draft.locator('#bound-target').waitFor({state:'visible'});
+      // Model the site's clipboard overwrite without reading or changing the OS clipboard.
+      await page.evaluate(text=>{window.clipboardForTest=text;
+        window.eraseClipboardForTest=()=>{window.clipboardForTest=' ';};
+        document.getElementById('plain').addEventListener('focus',window.eraseClipboardForTest);
+      },sql);
+      const copied=await page.evaluate(()=>clipboardForTest);
+      await draft.locator('#sql').fill(copied);
+      await draft.locator('#interval').fill('20');await draft.locator('#delay').fill('3');
+      const closed=draft.waitForEvent('close');await draft.locator('#start').click();await closed;
+      await page.bringToFront();await page.locator('#plain').focus();
+      assert.equal(await page.evaluate(()=>clipboardForTest),' ');
+      const state=await waitState('completed');assert.equal(state.tabId,tabId);
+      assert.equal(await page.locator('#plain').inputValue(),sql);
+      await page.locator('#plain').fill('');
+    }finally{
+      await page.evaluate(()=>{document.getElementById('plain').removeEventListener('focus',window.eraseClipboardForTest);delete window.eraseClipboardForTest;delete window.clipboardForTest;});
+      if(!draft.isClosed())await draft.close();await request('stop');
+    }
+  });
+  await check('closed bound target retains draft and reports error instead of using a different tab',async()=>{
+    const temporary=await context.newPage();await temporary.goto(url+'?closed-target');
+    const id=await worker.evaluate(async url=>(await chrome.debugger.getTargets()).find(t=>t.url===url).tabId,temporary.url());
+    const draft=await context.newPage();await draft.goto(`chrome-extension://${extensionId}/popup.html?target=${id}`);
+    await draft.locator('#sql').fill(sql);await temporary.close();
+    await draft.locator('#start').click();await draft.locator('#error').waitFor({state:'visible'});
+    assert.equal(await draft.locator('#sql').inputValue(),sql);assert.equal(draft.isClosed(),false);
+    assert.notEqual((await getStatus()).state,'running');await draft.close();
+  });
+  await check('opening an independent window cannot discard an existing popup draft',async()=>{
+    await popup.locator('#sql').fill(sql);await page.bringToFront();
+    const count=context.pages().length;
+    await popup.evaluate(()=>document.getElementById('open-window').click());
+    await popup.locator('#error').waitFor({state:'visible'});
+    assert.equal(await popup.locator('#sql').inputValue(),sql);assert.equal(context.pages().length,count);
+    await popup.locator('#sql').fill('');
+  });
 
   await check('native textarea preserves multiline SQL, spaces, tab, Unicode; no paste/Enter/Tab',async()=>{
     await begin(sql,()=>page.locator('#plain').focus());await waitState('completed');
@@ -68,6 +114,20 @@ try {
   await check('focus switch pauses and never types in another field',async()=>{
     await page.locator('#plain').fill('');await begin(sql,()=>page.locator('#plain').focus(),40);await waitState('running');
     await page.locator('#single').focus();await waitState('paused');assert.equal(await page.locator('#single').inputValue(),'');await request('stop');
+  });
+  await check('switching to another browser window still pauses input',async()=>{
+    await page.locator('#plain').fill('');await begin(sql,()=>page.locator('#plain').focus(),50);await waitState('running');
+    const other=await worker.evaluate(()=>chrome.windows.create({url:'about:blank',type:'popup',focused:true}));
+    try {
+      await worker.evaluate(id=>chrome.windows.update(id,{focused:true}),other.id);
+      assert.equal(await worker.evaluate(async id=>(await chrome.windows.get(id)).focused,other.id),true,'The other window must really gain focus');
+      await waitState('paused');const partial=await page.locator('#plain').inputValue();
+      await new Promise(r=>setTimeout(r,180));assert.equal(await page.locator('#plain').inputValue(),partial);
+    }finally{
+      await request('stop');await worker.evaluate(id=>chrome.windows.remove(id),other.id);
+      await worker.evaluate(async id=>chrome.windows.update((await chrome.tabs.get(id)).windowId,{focused:true}),tabId);
+      await page.bringToFront();
+    }
   });
   await check('single line pauses on newline and never sends Enter',async()=>{
     await begin('SELECT 1;\nSELECT 2;',()=>page.locator('#single').focus());await waitState('paused');assert.equal(await page.locator('#single').inputValue(),'SELECT 1;');await request('stop');
@@ -111,10 +171,10 @@ try {
       assert.deepEqual(await page.evaluate(()=>['autoClosingQuotes','autoIndent','formatOnType'].map(key=>editor.getOption(monacoForTest.editor.EditorOption[key]))),options);
     }finally{await page.evaluate(()=>{window.monaco=window.monacoForTest;delete window.monacoForTest;delete document.getElementById('monaco').__reactFiber$sqlTest;});await request('stop');}
   });
-  if(!process.env.SQL_TYPER_SKIP_IMAGES) {
+  if(!process.env.SQL_TYPER_SKIP_IMAGES && !process.env.SQL_TYPER_CASE) {
     await page.bringToFront();await page.screenshot({path:resolve('tests/fixture-result.png'),fullPage:true});
     await popup.bringToFront();await request('stop');await popup.locator('#sql').fill(sql);await popup.locator('body').screenshot({path:resolve('tests/popup-preview.png')});
   }
   const reportName=executablePath.toLowerCase().includes('msedge')?'edge':'chromium';
-  await writeFile(resolve(`docs/test-results-${reportName}.md`),`# Browser verification\n\n${new Date().toISOString()}\n\nBrowser: ${context.browser().version()} (${reportName}; headless; actual MV3 extension).\n\n${results.map(name=>'- PASS '+name).join('\n')}\n\n完整扩展队列测试使用本地测试页；头歌真实页面的适配器和输入引擎验证见 educoder-verification.md。\n`);
+  if(!process.env.SQL_TYPER_CASE)await writeFile(resolve(`docs/test-results-${reportName}.md`),`# Browser verification\n\n${new Date().toISOString()}\n\nBrowser: ${context.browser().version()} (${reportName}; headless; actual MV3 extension).\n\n${results.map(name=>'- PASS '+name).join('\n')}\n\n完整扩展队列测试使用本地测试页；头歌真实页面的适配器和输入引擎验证见 educoder-verification.md。\n`);
 }finally{await context.close();await new Promise(resolve=>server.close(resolve));}
